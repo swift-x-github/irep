@@ -44,38 +44,27 @@ class MineRecognizer
   # Основной метод обработки текста новостей
   def process_news(file_path)
     news_text = File.read(file_path)
-    
-    # Загрузка известных локаций
     location_extractor = LocationExtractor.new(EXCEL_FILE)
     known_locations = location_extractor.known_locations.map do |loc|
       [loc[:region], loc[:country], loc[:state]].compact.map(&:downcase)
     end.flatten.uniq
   
-    # Классификация сущностей
-    mines, companies, metrics, tickers = classify_entities(news_text, known_locations)
+    # Шаг 1: Классификация шахт и компаний
+    mines, companies = classify_mines_and_companies(news_text, known_locations)
+  
+    # Шаг 2: Извлечение метрик и тикеров
+    metrics, tickers = extract_metrics_and_tickers(news_text)
+  
+    # Шаг 3: Извлечение дат, email и URL
     entities = extract_dates_and_links(news_text)
   
-    # Очистка и нормализация списков
-    mines[:existing] = clean_list(mines[:existing])
-    mines[:new] = clean_list(mines[:new])
-    companies = clean_list(companies)
-    metrics = clean_list(metrics)
-    tickers = clean_list(tickers)
-    entities[:datetime] = entities[:datetime].uniq
-    entities[:emails] = entities[:emails].uniq
-    entities[:urls] = entities[:urls].uniq
-  
-    # Вывод результатов
+    # Шаг 4: Очистка и вывод результатов
     puts "Detected Mines:"
-    if mines[:existing].any?
-      puts "\nExisting Mines:"
-      mines[:existing].each { |mine| puts "- #{mine}" }
-    end
-  
-    if mines[:new].any?
-      puts "\nPotential New Mines:"
-      mines[:new].each { |mine| puts "- #{mine}" }
-    end
+    puts "\nExisting Mines:" unless mines[:existing].empty?
+    mines[:existing].each { |mine| puts "- #{mine}" }
+    
+    puts "\nPotential New Mines:" unless mines[:new].empty?
+    mines[:new].each { |mine| puts "- #{mine}" }
   
     puts "\nDetected Companies:"
     companies.each { |company| puts "- #{company}" }
@@ -95,6 +84,7 @@ class MineRecognizer
     puts "\nExtracted URLs:"
     entities[:urls].each { |url| puts "- #{url} (URL)" }
   end
+  
   
 
   private
@@ -141,14 +131,14 @@ class MineRecognizer
   end
 
   # Классификация сущностей из текста
-  def classify_entities(text, known_locations)
+  
+  def classify_mines_and_companies(text, known_locations)
     sentences = text.split(/(?<=\.)/)
     mines = { existing: [], new: [] }
     companies = []
-    metrics = []
-    tickers = []
   
     extra_words = %w[mine pit shaft quarry tunnel field resources inc et production reports record cost average doe nyse end]
+    known_locations ||= []
   
     sentences.each do |sentence|
       tokens = Mitie::tokenize(sentence)
@@ -158,44 +148,55 @@ class MineRecognizer
         entity_text = tokens[entity[:token_index], entity[:token_length]].join(' ').strip.downcase
         normalized_text = entity_text.split.reject { |w| extra_words.include?(w) }.join(' ')
   
-        # Пропускаем известные локации
-        next if known_locations.include?(normalized_text)
-  
-        # Проверка на существующие шахты (точное или fuzzy соответствие)
-        existing_mine = @mine_data.find { |mine| mine[:name]&.downcase == normalized_text || fuzzy_match(mine[:name], normalized_text) }
+        # Проверка на существующие шахты
+        existing_mine = @mine_data.find { |mine| fuzzy_match(mine[:name], normalized_text) }
         if existing_mine
           mines[:existing] << existing_mine[:name].capitalize
           next
         end
   
-        # Проверка на компании (точное соответствие по owner)
-        existing_company = @mine_data.find { |mine| mine[:owner]&.downcase == normalized_text || fuzzy_match(mine[:owner], normalized_text) }
+        # Исключаем известные локации
+        next if known_locations.include?(normalized_text)
+  
+        # Проверка на компании
+        existing_company = @mine_data.find { |mine| fuzzy_match(mine[:owner], normalized_text) }
         if existing_company
           companies << existing_company[:owner].capitalize
           next
         end
   
-        # Проверка на новые шахты по ключевым словам
+        # Проверка на новые шахты
         if @mine_keywords.any? { |kw| entity_text.include?(kw) }
           mines[:new] << entity_text.capitalize
         end
       end
+    end
   
-      # Проверка на метрики и тикеры
+    # Очистка и нормализация
+    mines[:existing].uniq!
+    mines[:new] = clean_list(mines[:new]) - companies
+    companies.uniq!
+  
+    [mines, companies]
+  end
+  
+  def extract_metrics_and_tickers(text)
+    sentences = text.split(/(?<=\.)/)
+    metrics = []
+    tickers = []
+  
+    sentences.each do |sentence|
+      # Проверка на метрики
       metrics += @metrics.select { |metric| sentence.downcase.include?(metric.downcase) }
+  
+      # Проверка на тикеры
       tickers += @ticker_symbols.select { |ticker| sentence.upcase.include?(ticker) }
     end
   
-    # Очистка и нормализация списков
-    mines[:existing].uniq!
-    mines[:new] = clean_list(mines[:new])
-    companies.uniq!
-    companies -= mines[:existing] # Исключаем шахты из списка компаний
-    metrics.uniq!
-    tickers.uniq!
-  
-    [mines, companies, metrics, tickers]
+    [metrics.uniq, tickers.uniq]
   end
+
+  
   
   
   
