@@ -4,6 +4,7 @@ require 'yaml'
 require 'date'
 require 'fuzzy_match'
 
+EXCEL_FILE = File.expand_path("data/Gold Mines Dataset Subsample CONFIDENTIAL 23 02 2024.xlsx", __dir__)
 # Класс для распознавания и классификации сущностей
 class MineRecognizer
   attr_reader :mine_data, :metrics, :ticker_symbols, :ner
@@ -43,7 +44,15 @@ class MineRecognizer
   # Основной метод обработки текста новостей
   def process_news(file_path)
     news_text = File.read(file_path)
-    mines, companies, metrics, tickers = classify_entities(news_text)
+    
+    # Загрузка известных локаций
+    location_extractor = LocationExtractor.new(EXCEL_FILE)
+    known_locations = location_extractor.known_locations.map do |loc|
+      [loc[:region], loc[:country], loc[:state]].compact.map(&:downcase)
+    end.flatten.uniq
+  
+    # Классификация сущностей
+    mines, companies, metrics, tickers = classify_entities(news_text, known_locations)
     entities = extract_dates_and_links(news_text)
   
     # Очистка и нормализация списков
@@ -132,12 +141,14 @@ class MineRecognizer
   end
 
   # Классификация сущностей из текста
-  def classify_entities(text)
+  def classify_entities(text, known_locations)
     sentences = text.split(/(?<=\.)/)
-    mines = { existing: [], new: [] } # Используем хэш для шахт
+    mines = { existing: [], new: [] }
     companies = []
     metrics = []
     tickers = []
+  
+    extra_words = %w[mine pit shaft quarry tunnel field resources inc et production reports record cost average doe nyse end]
   
     sentences.each do |sentence|
       tokens = Mitie::tokenize(sentence)
@@ -145,30 +156,48 @@ class MineRecognizer
   
       entities.each do |entity|
         entity_text = tokens[entity[:token_index], entity[:token_length]].join(' ').strip.downcase
+        normalized_text = entity_text.split.reject { |w| extra_words.include?(w) }.join(' ')
   
-        # Проверка на компании
-        if @mine_data.any? { |mine| mine[:owner]&.casecmp?(entity_text) }
-          companies << entity_text.capitalize
+        # Пропускаем известные локации
+        next if known_locations.include?(normalized_text)
   
-        # Проверка на существующие шахты
-        elsif @mine_data.any? { |mine| mine[:name]&.casecmp?(entity_text) }
-          mines[:existing] << entity_text.capitalize
+        # Проверка на существующие шахты (точное или fuzzy соответствие)
+        existing_mine = @mine_data.find { |mine| mine[:name]&.downcase == normalized_text || fuzzy_match(mine[:name], normalized_text) }
+        if existing_mine
+          mines[:existing] << existing_mine[:name].capitalize
+          next
+        end
+  
+        # Проверка на компании (точное соответствие по owner)
+        existing_company = @mine_data.find { |mine| mine[:owner]&.downcase == normalized_text || fuzzy_match(mine[:owner], normalized_text) }
+        if existing_company
+          companies << existing_company[:owner].capitalize
+          next
+        end
   
         # Проверка на новые шахты по ключевым словам
-        elsif @mine_keywords.any? { |kw| entity_text.include?(kw) }
+        if @mine_keywords.any? { |kw| entity_text.include?(kw) }
           mines[:new] << entity_text.capitalize
         end
       end
   
-      # Проверка на метрики
-      metrics += @metrics.select { |metric| sentence.include?(metric) }
-  
-      # Проверка на тикеры
+      # Проверка на метрики и тикеры
+      metrics += @metrics.select { |metric| sentence.downcase.include?(metric.downcase) }
       tickers += @ticker_symbols.select { |ticker| sentence.upcase.include?(ticker) }
     end
   
-    [mines, companies.uniq, metrics.uniq, tickers.uniq] # Возвращаем хэш для шахт и массивы для других
+    # Очистка и нормализация списков
+    mines[:existing].uniq!
+    mines[:new] = clean_list(mines[:new])
+    companies.uniq!
+    companies -= mines[:existing] # Исключаем шахты из списка компаний
+    metrics.uniq!
+    tickers.uniq!
+  
+    [mines, companies, metrics, tickers]
   end
+  
+  
   
   # Метод для извлечения дат, времени, email и URL из текста
   def extract_dates_and_links(text)
@@ -199,6 +228,11 @@ class MineRecognizer
     entities
   end
 
+    # Метод для fuzzy-сравнения строк
+  def fuzzy_match(name1, name2)
+    return false if name1.nil? || name2.nil?
+    FuzzyMatch.new([name1.downcase]).find(name2.downcase)
+  end
 end
 
 
