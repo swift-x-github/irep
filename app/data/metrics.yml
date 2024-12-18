@@ -1,0 +1,50 @@
+financial_metrics:
+  - "AISC"
+  - "All-in sustaining costs"
+  - "Cash Cost"
+  - "Cash costs"
+  - "Total costs"
+  - "CAPEX"
+  - "Net Cash Flow"
+  - "EBITDA"
+  - "Free Cash Flow"
+  - "Sustaining Capital"
+
+production_metrics:
+  - "Recovery Rate"
+  - "Gold Production"
+  - "Grade"
+  - "g/t"
+  - "Strip Ratio"
+  - "Throughput"
+  - "Ore Processing Cost"
+  - "Tonne per day"
+  - "Ounce per year"
+
+market_metrics:
+  - "Gold Spot Price"
+  - "Copper Price"
+  - "Gold Price"
+  - "Hedging"
+  - "XAU"
+  - "GOLD"
+  - "AU"
+  - "XAG"
+
+resource_metrics:
+  - "Proven Reserves"
+  - "Probable Reserves"
+  - "Mineral Resources"
+  - "Gold Reserves"
+  - "Ore Reserves"
+  - "Goldfield"
+
+esg_metrics:
+  - "CO₂ Emissions"
+  - "Water Usage"
+  - "Safety Incidents"
+
+exploration_metrics:
+  - "Exploration Costs"
+  - "Development Timeline"
+  - "Project IRR"
