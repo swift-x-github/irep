@@ -4,3 +4,4 @@ ticker_symbols_file: data/ticker_symbols.yml
 mine_keywords_file: data/mine_keywords.yml
 ner_model_path: /home/swiftx/Desktop/ZHAW/IREP/MITIE-models-v0.2/MITIE-models/english/ner_model.dat
 news_file: data/example_news.txt
+model: mitie

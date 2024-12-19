@@ -30,8 +30,10 @@ class MineClassifier
 
   def classify_entity(entity_text, mines, companies)
     normalized_text = entity_text.gsub(/[^a-z0-9\s]/, '').strip.downcase
-    existing_mine = @mine_data.find { |mine| fuzzy_match(mine[:name], normalized_text) }
-
+    #existing_mine = @mine_data.find { |mine| fuzzy_match(mine[:name], normalized_text) }
+    existing_mine = @mine_data.find { |mine| mine[:name] == normalized_text }
+    mines[:existing].uniq!
+    
     if existing_mine
       mines[:existing] << existing_mine[:name].capitalize
     elsif @mine_keywords.any? { |kw| entity_text.include?(kw) }

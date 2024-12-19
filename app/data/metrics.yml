@@ -48,3 +48,7 @@ exploration_metrics:
   - "Exploration Costs"
   - "Development Timeline"
   - "Project IRR"
+
+# metrics:
+#   - "Gold"
+#   - "Silver"

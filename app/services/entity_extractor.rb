@@ -10,6 +10,13 @@ class EntityExtractor
     [metrics.uniq, tickers.uniq]
   end
 
+  # def extract_metrics_and_tickers(text)
+  #   metrics = @metrics.select { |metric| text.downcase.include?(metric.downcase) }
+  #   tickers = @ticker_symbols.select { |ticker| text.upcase.include?(ticker) && ticker.match?(/^\w{1,4}$/) }
+  #   [metrics.uniq, tickers.uniq]
+  # end
+
+  
   def extract_dates_and_links(text)
     datetime_regex = /(\w+\s\d{1,2},\s\d{4})\s?(\d{1,2}:\d{2}\s?(?:AM|PM|ET|GMT)?)/i
     date_regex = /(\b\w+\s\d{1,2},\s\d{4}\b)|(\b\d{4}-\d{2}-\d{2}\b)/
